@@ -135,10 +135,20 @@ class ParquetValidator:
 
     def _validate_parquet_files(self, path: Path) -> None:
         """Recursively validate parquet files and their schemas."""
+        # List of Databricks-specific file prefixes to ignore
+        DATABRICKS_FILE_PREFIXES = {'_SUCCESS', '_committed_', '_started_'}
+        
         for item in path.iterdir():
             if item.is_dir():
                 self._validate_parquet_files(item)
-            elif item.suffix == '.parquet':
+            elif any(item.name.startswith(prefix) for prefix in DATABRICKS_FILE_PREFIXES):
+                # Ignore Databricks-specific files (including those with timestamps)
+                continue
+            elif item.suffix != '.parquet':
+                # Report other non-parquet files as errors
+                self.errors.append(f"Non-parquet file found: {item}")
+                continue
+            else:
                 try:
                     # Read only metadata to be efficient
                     parquet_file = pq.ParquetFile(item)
