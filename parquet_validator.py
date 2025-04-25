@@ -69,6 +69,35 @@ class ParquetValidator:
 
     def _check_conflicting_structures(self) -> None:
         """Check for conflicting directory structures at each level."""
+        # First, check if we have multiple root paths that could cause conflicts
+        root_paths = set()
+        for level, structures in self.directory_structures.items():
+            for structure in structures:
+                # Get the root path (first directory in the structure)
+                if structure:
+                    root_paths.add(structure[0])
+        
+        # If we have multiple root paths, check if they are all partition paths
+        # (i.e., they all contain '=' in their name)
+        if len(root_paths) > 1:
+            all_partition_paths = all("=" in path for path in root_paths)
+            if not all_partition_paths:
+                self.errors.append(
+                    "[CONFLICTING_DIRECTORY_STRUCTURES] Conflicting directory structures detected.\n"
+                    "Suspicious paths:\n"
+                )
+                for root_path in root_paths:
+                    path = str(self.base_path / root_path)
+                    self.errors.append(f"\t{path}")
+                
+                self.errors.append(
+                    "\nIf provided paths are partition directories, please set 'basePath' in the options "
+                    "of the data source to specify the root directory of the table.\n"
+                    "If there are multiple root directories, please load them separately and then union them."
+                )
+                return
+
+        # If no root path conflicts, check for partition key conflicts at each level
         for level, structures in self.directory_structures.items():
             # Get all partition keys at this level
             partition_keys = set()
