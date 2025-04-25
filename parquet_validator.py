@@ -49,6 +49,10 @@ class ParquetValidator:
     def _validate_folder_structure(self, path: Path, current_structure: Tuple[str, ...] = ()) -> None:
         """Recursively validate folder structure and collect partition information."""
         for item in path.iterdir():
+            # Skip _SUCCESS files
+            if item.name == '_SUCCESS':
+                continue
+                
             if item.is_dir():
                 new_structure = current_structure + (item.name,)
                 
@@ -98,14 +102,19 @@ class ParquetValidator:
                 return
 
         # If no root path conflicts, check for partition key conflicts at each level
+        # Skip the first level (root directory) since it might not have partition directories
         for level, structures in self.directory_structures.items():
+            if level == 1:  # Skip root directory level
+                continue
+                
             # Get all partition keys at this level
             partition_keys = set()
             for structure in structures:
-                for dir_name in structure:
-                    if "=" in dir_name:
-                        key, _ = dir_name.split("=", 1)
-                        partition_keys.add(key)
+                # Only check the last directory in the structure for this level
+                dir_name = structure[-1]
+                if "=" in dir_name:
+                    key, _ = dir_name.split("=", 1)
+                    partition_keys.add(key)
             
             # If we have multiple different partition keys at the same level, that's a conflict
             if len(partition_keys) > 1:
